@@ -1,735 +1,613 @@
-"""
-app.py — Gnaneswar Fitness AI
-Main Streamlit application entry point.
-
-Run with:   streamlit run app.py
-"""
-
 import streamlit as st
+from database import init_db, save_profile, get_profile, save_progress, save_chat_message, get_chat_history
+from auth import register_user, login_user
+from fitness_calc import get_all_calculations
+from ai_engine import generate_diet_plan, generate_workout_plan, chat_with_trainer
+from progress_tracker import get_progress_charts
 from datetime import date
 
-# Internal modules
-import database as db
-import auth as auth_module
-import fitness_calc as calc
-import ai_engine as ai
-import progress_tracker as pt
-
-# ---------------------------------------------------------------------------
-# Page config (must be first Streamlit call)
-# ---------------------------------------------------------------------------
+# ─── PAGE CONFIG ─────────────────────────────────────────────────
 st.set_page_config(
     page_title="Gnaneswar Fitness AI",
     page_icon="💪",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="expanded"
 )
 
-# ---------------------------------------------------------------------------
-# Global CSS
-# ---------------------------------------------------------------------------
-GLOBAL_CSS = """
+# ─── INIT DB ─────────────────────────────────────────────────────
+init_db()
+
+# ─── GLOBAL CSS — Dark Orange Animated Theme ─────────────────────
+st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap');
 
-html, body, [data-testid="stAppViewContainer"] {
-    background: #0A0A0F !important;
-    color: #E8E8E8 !important;
-    font-family: 'Inter', sans-serif;
+/* ── Base ── */
+* { font-family: 'Rajdhani', sans-serif !important; }
+.stApp { background: #050810 !important; }
+
+/* ── Grid background ── */
+.stApp::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background-image:
+        linear-gradient(rgba(255,107,53,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,107,53,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
 }
 
-#MainMenu {visibility: hidden;}
-footer {visibility: hidden;}
-header {visibility: hidden;}
-
+/* ── Sidebar ── */
 [data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #0D0D1A 0%, #12121F 100%) !important;
-    border-right: 1px solid #FF6B35 !important;
+    background: linear-gradient(180deg, #0D1525 0%, #050810 100%) !important;
+    border-right: 1px solid rgba(255,107,53,0.2) !important;
 }
-[data-testid="stSidebar"] * { color: #E8E8E8 !important; }
+[data-testid="stSidebar"] * { color: #E0E0E0 !important; }
 
-.main-header {
-    background: linear-gradient(135deg, #0D0D1A 0%, #1A0D2E 50%, #0D1A0D 100%);
-    border: 1px solid #FF6B35;
-    border-radius: 16px;
-    padding: 30px 40px;
-    margin-bottom: 30px;
-    text-align: center;
-}
-.main-title {
-    font-family: 'Oswald', sans-serif;
-    font-size: 3rem;
-    font-weight: 700;
-    background: linear-gradient(90deg, #FF6B35, #FF9A3C, #FFCC02);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    margin: 0;
-    letter-spacing: 3px;
-}
-.main-subtitle {
-    color: #9090AA;
-    font-size: 1rem;
-    letter-spacing: 2px;
-    margin-top: 8px;
-    text-transform: uppercase;
-}
-
-.metric-card {
-    background: linear-gradient(135deg, #12121F, #1A1A2E);
-    border: 1px solid rgba(255, 107, 53, 0.3);
-    border-radius: 12px;
-    padding: 20px;
-    text-align: center;
-    margin-bottom: 16px;
-}
-.metric-value {
-    font-family: 'Oswald', sans-serif;
-    font-size: 2.2rem;
-    color: #FF6B35;
-    font-weight: 700;
-    line-height: 1;
-}
-.metric-label {
-    font-size: 0.75rem;
-    color: #9090AA;
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    margin-top: 6px;
-}
-
-.section-header {
-    font-family: 'Oswald', sans-serif;
-    font-size: 1.6rem;
-    color: #FF6B35;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    border-bottom: 2px solid rgba(255,107,53,0.3);
-    padding-bottom: 10px;
-    margin-bottom: 20px;
-}
-
-div.stButton > button {
-    background: linear-gradient(135deg, #FF6B35, #FF4500) !important;
+/* ── Buttons ── */
+.stButton > button {
+    background: linear-gradient(135deg, #FF6B35, #E55A20) !important;
     color: white !important;
     border: none !important;
     border-radius: 8px !important;
-    font-family: 'Oswald', sans-serif !important;
-    font-size: 1rem !important;
-    letter-spacing: 1.5px !important;
+    font-weight: 700 !important;
+    font-size: 15px !important;
+    letter-spacing: 1px !important;
+    padding: 0.6rem 2rem !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 4px 15px rgba(255,107,53,0.3) !important;
     text-transform: uppercase !important;
-    padding: 10px 24px !important;
-    width: 100% !important;
+}
+.stButton > button:hover {
+    transform: translateY(-3px) !important;
+    box-shadow: 0 8px 25px rgba(255,107,53,0.5) !important;
+    background: linear-gradient(135deg, #FF8C5A, #FF6B35) !important;
+}
+.stButton > button:active {
+    transform: translateY(0px) !important;
 }
 
-.chat-user {
-    background: linear-gradient(135deg, #1A1A2E, #12122E);
-    border-left: 3px solid #FF6B35;
-    border-radius: 0 12px 12px 0;
-    padding: 12px 16px;
-    margin: 8px 0;
-    font-size: 0.95rem;
+/* ── Inputs ── */
+.stTextInput > div > div > input,
+.stNumberInput > div > div > input,
+.stSelectbox > div > div > div,
+.stTextArea > div > div > textarea {
+    background: #0D1525 !important;
+    border: 1px solid rgba(255,107,53,0.3) !important;
+    border-radius: 8px !important;
+    color: white !important;
+    font-size: 14px !important;
 }
-.chat-bot {
-    background: linear-gradient(135deg, #0D1A0D, #121F12);
-    border-left: 3px solid #2ECC40;
-    border-radius: 0 12px 12px 0;
-    padding: 12px 16px;
-    margin: 8px 0;
-    font-size: 0.95rem;
-}
-.chat-label {
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    color: #9090AA;
-    margin-bottom: 4px;
+.stTextInput > div > div > input:focus,
+.stNumberInput > div > div > input:focus {
+    border-color: #FF6B35 !important;
+    box-shadow: 0 0 10px rgba(255,107,53,0.3) !important;
 }
 
-.info-box {
-    background: rgba(0, 212, 255, 0.08);
-    border: 1px solid rgba(0, 212, 255, 0.3);
-    border-radius: 10px;
-    padding: 16px;
-    margin: 12px 0;
-    color: #AAD4FF;
-}
-.success-box {
-    background: rgba(46, 204, 64, 0.08);
-    border: 1px solid rgba(46, 204, 64, 0.3);
-    border-radius: 10px;
-    padding: 16px;
-    margin: 12px 0;
-    color: #7AFF8A;
-}
-.warning-box {
-    background: rgba(255, 220, 0, 0.08);
-    border: 1px solid rgba(255, 220, 0, 0.3);
-    border-radius: 10px;
-    padding: 16px;
-    margin: 12px 0;
-    color: #FFE566;
+/* ── Labels ── */
+label, .stSelectbox label, .stTextInput label,
+.stNumberInput label, p, .stMarkdown p {
+    color: #E0E0E0 !important;
 }
 
-.ai-output {
-    background: linear-gradient(135deg, #0D1520, #0D0D1A);
-    border: 1px solid rgba(255,107,53,0.25);
-    border-radius: 12px;
-    padding: 24px;
-    margin-top: 16px;
-    font-size: 0.92rem;
-    line-height: 1.7;
-    max-height: 600px;
-    overflow-y: auto;
+/* ── Metrics ── */
+[data-testid="metric-container"] {
+    background: linear-gradient(135deg, rgba(255,107,53,0.1), rgba(255,107,53,0.05)) !important;
+    border: 1px solid rgba(255,107,53,0.3) !important;
+    border-radius: 12px !important;
+    padding: 1rem !important;
+}
+[data-testid="metric-container"] label { color: #888 !important; }
+[data-testid="metric-container"] [data-testid="metric-value"] {
+    color: #FF6B35 !important;
+    font-size: 2rem !important;
+    font-weight: 700 !important;
 }
 
+/* ── Success / Error ── */
+.stSuccess { background: rgba(46,204,113,0.1) !important; border-left: 4px solid #2ECC71 !important; }
+.stError   { background: rgba(231,76,60,0.1)  !important; border-left: 4px solid #E74C3C  !important; }
+.stInfo    { background: rgba(52,152,219,0.1) !important; border-left: 4px solid #3498DB  !important; }
+.stWarning { background: rgba(243,156,18,0.1) !important; border-left: 4px solid #F39C18  !important; }
+
+/* ── Spinner ── */
+.stSpinner > div { border-top-color: #FF6B35 !important; }
+
+/* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #0A0A0F; }
+::-webkit-scrollbar-track { background: #050810; }
 ::-webkit-scrollbar-thumb { background: #FF6B35; border-radius: 3px; }
+
+/* ── Animations ── */
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.6; }
+}
+@keyframes glow {
+    0%, 100% { text-shadow: 0 0 10px rgba(255,107,53,0.5); }
+    50%       { text-shadow: 0 0 30px rgba(255,107,53,0.9), 0 0 60px rgba(255,107,53,0.5); }
+}
+@keyframes slideIn {
+    from { opacity: 0; transform: translateX(-20px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes spin {
+    0%   { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
 </style>
-"""
-st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
-
-# ---------------------------------------------------------------------------
-# Database init
-# ---------------------------------------------------------------------------
-db.init_db()
-
-# ---------------------------------------------------------------------------
-# Session state helpers
-# ---------------------------------------------------------------------------
-def init_session():
-    defaults = {
-        "logged_in": False,
-        "user_id": None,
-        "user_name": "",
-        "current_page": "🏠 Home",
-        "diet_plan": "",
-        "workout_plan": "",
-        "chat_messages": [],
-        "chat_loaded": False,
-    }
-    for key, val in defaults.items():
-        if key not in st.session_state:
-            st.session_state[key] = val
+""", unsafe_allow_html=True)
 
 
-init_session()
+# ─── HELPER: HTML COMPONENTS ─────────────────────────────────────
 
-
-def get_profile_dict():
-    if not st.session_state.logged_in:
-        return {}
-    profile = db.get_profile(st.session_state.user_id)
-    user = db.get_user_by_id(st.session_state.user_id)
-    if not profile:
-        return {}
-    return {
-        "name": user["name"] if user else "User",
-        "age": profile["age"],
-        "gender": profile["gender"],
-        "height": profile["height"],
-        "weight": profile["weight"],
-        "goal": profile["goal"],
-        "experience": profile["experience"],
-        "bmi": profile["bmi"],
-        "bmr": profile["bmr"],
-        "daily_calories": profile["daily_calories"],
-        "protein_req": profile["protein_req"],
-    }
-
-
-# ---------------------------------------------------------------------------
-# Sidebar Navigation
-# ---------------------------------------------------------------------------
-def render_sidebar():
-    with st.sidebar:
-        st.markdown("""
-        <div style='text-align:center; padding: 10px 0 20px 0;'>
-            <div style='font-family:Oswald,sans-serif; font-size:1.6rem;
-                        color:#FF6B35; letter-spacing:2px; font-weight:700;'>
-                💪 FITNESS AI
-            </div>
-            <div style='font-size:0.7rem; color:#9090AA; letter-spacing:2px;
-                        text-transform:uppercase; margin-top:4px;'>
-                GNANESWAR EDITION
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        st.markdown("<hr style='border-color:rgba(255,107,53,0.2);'>", unsafe_allow_html=True)
-
-        if st.session_state.logged_in:
-            st.markdown(f"""
-            <div style='background:rgba(255,107,53,0.1); border:1px solid rgba(255,107,53,0.3);
-                        border-radius:8px; padding:12px; margin-bottom:16px; text-align:center;'>
-                <div style='font-size:0.7rem; color:#9090AA; text-transform:uppercase;'>Logged in as</div>
-                <div style='font-family:Oswald,sans-serif; font-size:1.1rem; color:#FF6B35; margin-top:4px;'>
-                    {st.session_state.user_name}
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-            pages = [
-                "🏠 Home",
-                "👤 My Profile",
-                "🥗 AI Diet Planner",
-                "🏋️ AI Workout Generator",
-                "🤖 AI Trainer Chat",
-                "📊 Progress Tracker",
-            ]
-        else:
-            pages = ["🏠 Home", "🔐 Login / Register"]
-
-        selected = st.radio("Navigate", pages, label_visibility="collapsed", key="nav_radio")
-        st.session_state.current_page = selected
-
-        if st.session_state.logged_in:
-            st.markdown("<hr style='border-color:rgba(255,107,53,0.2);'>", unsafe_allow_html=True)
-            if st.button("🚪 Logout"):
-                for key in list(st.session_state.keys()):
-                    del st.session_state[key]
-                init_session()
-                st.rerun()
-
-
-# ---------------------------------------------------------------------------
-# Page: Home
-# ---------------------------------------------------------------------------
-def page_home():
-    st.markdown("""
-    <div class='main-header'>
-        <div class='main-title'>⚡ GNANESWAR FITNESS AI</div>
-        <div class='main-subtitle'>Your AI-Powered Personal Gym Trainer & Nutritionist</div>
+def hero_title(title, subtitle=""):
+    st.markdown(f"""
+    <div style="text-align:center; padding: 2rem 0 1rem 0;
+                animation: fadeInUp 0.8s ease;">
+        <h1 style="font-family:'Orbitron',monospace; font-size:2.8rem;
+                   font-weight:900; color:#FF6B35; letter-spacing:3px;
+                   text-transform:uppercase; animation: glow 3s ease infinite;
+                   text-shadow: 0 0 20px rgba(255,107,53,0.5);">
+            {title}
+        </h1>
+        {"<p style='color:#888; font-size:1.1rem; letter-spacing:2px; margin-top:0.5rem;'>" + subtitle + "</p>" if subtitle else ""}
     </div>
     """, unsafe_allow_html=True)
 
-    col1, col2, col3 = st.columns(3)
+
+def section_header(text, icon=""):
+    st.markdown(f"""
+    <div style="display:flex; align-items:center; gap:12px;
+                margin: 1.5rem 0 1rem 0; animation: slideIn 0.5s ease;">
+        <div style="width:4px; height:28px; background:#FF6B35;
+                    border-radius:2px; box-shadow: 0 0 10px rgba(255,107,53,0.5);"></div>
+        <h2 style="color:#FF6B35; font-size:1.4rem; font-weight:700;
+                   margin:0; letter-spacing:1px;">{icon} {text}</h2>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def info_card(title, value, icon="", color="#FF6B35"):
+    st.markdown(f"""
+    <div style="background: linear-gradient(135deg, rgba(255,107,53,0.08), rgba(255,107,53,0.02));
+                border: 1px solid rgba(255,107,53,0.25); border-radius:12px;
+                padding:1.2rem; text-align:center; margin:0.3rem 0;
+                animation: fadeInUp 0.5s ease;
+                transition: transform 0.3s, box-shadow 0.3s;"
+         onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 8px 25px rgba(255,107,53,0.2)'"
+         onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='none'">
+        <div style="font-size:1.8rem;">{icon}</div>
+        <div style="font-size:1.6rem; font-weight:700; color:{color}; margin:0.3rem 0;">{value}</div>
+        <div style="font-size:0.85rem; color:#888; letter-spacing:1px;">{title}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def chat_bubble(role, message):
+    is_user = role == "user"
+    align = "flex-end" if is_user else "flex-start"
+    bg = "linear-gradient(135deg, #FF6B35, #E55A20)" if is_user else "linear-gradient(135deg, #1E2761, #0D1525)"
+    border = "none" if is_user else "1px solid rgba(255,107,53,0.3)"
+    label = "👤 You" if is_user else "🤖 AI Trainer"
+    st.markdown(f"""
+    <div style="display:flex; justify-content:{align}; margin:0.5rem 0;
+                animation: fadeInUp 0.3s ease;">
+        <div style="max-width:75%; background:{bg}; border:{border};
+                    border-radius:12px; padding:0.8rem 1rem;">
+            <div style="font-size:0.75rem; color:rgba(255,255,255,0.6);
+                        margin-bottom:0.3rem; font-weight:600;">{label}</div>
+            <div style="color:white; font-size:0.95rem; line-height:1.5;">{message}</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+# ─── SESSION STATE ────────────────────────────────────────────────
+if 'user_id'   not in st.session_state: st.session_state.user_id   = None
+if 'user_name' not in st.session_state: st.session_state.user_name = None
+if 'page'      not in st.session_state: st.session_state.page      = 'Home'
+
+
+# ─── SIDEBAR ─────────────────────────────────────────────────────
+with st.sidebar:
+    st.markdown("""
+    <div style="text-align:center; padding:1rem 0;">
+        <div style="font-size:3rem; animation: pulse 2s infinite;">💪</div>
+        <div style="font-family:'Orbitron',monospace; font-size:1rem;
+                    font-weight:900; color:#FF6B35; letter-spacing:2px;
+                    margin-top:0.5rem;">GNANESWAR</div>
+        <div style="font-family:'Orbitron',monospace; font-size:0.7rem;
+                    color:#888; letter-spacing:3px;">FITNESS AI</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    if st.session_state.user_id:
+        st.markdown(f"""
+        <div style="background:rgba(255,107,53,0.1); border:1px solid rgba(255,107,53,0.3);
+                    border-radius:8px; padding:0.8rem; text-align:center; margin-bottom:1rem;">
+            <div style="font-size:1.5rem;">👋</div>
+            <div style="color:#FF6B35; font-weight:700; font-size:1rem;">
+                {st.session_state.user_name}
+            </div>
+            <div style="color:#888; font-size:0.75rem;">Logged In ✅</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        pages = ["🏠 Home", "👤 My Profile", "🥗 Diet Plan",
+                 "🏋️ Workout", "🤖 AI Trainer", "📈 Progress"]
+        page_map = {
+            "🏠 Home": "Home", "👤 My Profile": "Profile",
+            "🥗 Diet Plan": "Diet", "🏋️ Workout": "Workout",
+            "🤖 AI Trainer": "Chat", "📈 Progress": "Progress"
+        }
+        selected = st.radio("Navigate", pages, label_visibility="collapsed")
+        st.session_state.page = page_map[selected]
+
+        st.markdown("---")
+        if st.button("🚪 Logout", use_container_width=True):
+            st.session_state.user_id   = None
+            st.session_state.user_name = None
+            st.session_state.page      = "Home"
+            st.rerun()
+    else:
+        pages = ["🏠 Home", "🔐 Login", "📝 Register"]
+        page_map = {"🏠 Home": "Home", "🔐 Login": "Login", "📝 Register": "Register"}
+        selected = st.radio("Navigate", pages, label_visibility="collapsed")
+        st.session_state.page = page_map[selected]
+
+
+# ════════════════════════════════════════════════════════════════
+# PAGE: HOME
+# ════════════════════════════════════════════════════════════════
+if st.session_state.page == "Home":
+    hero_title("GNANESWAR FITNESS AI", "AI-Powered Personal Fitness Assistant")
+
+    st.markdown("""
+    <div style="text-align:center; max-width:700px; margin:0 auto 2rem auto;
+                color:#888; font-size:1.05rem; line-height:1.7;
+                animation: fadeInUp 1s ease;">
+        Get personalized diet plans, workout programs, and real-time fitness
+        coaching powered by <span style="color:#FF6B35; font-weight:700;">
+        LLaMA 3.1</span> — 8 Billion parameter AI by Meta, accessed via
+        <span style="color:#FF6B35; font-weight:700;">Groq API</span>.
+    </div>
+    """, unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
     features = [
-        ("🥗", "AI Diet Planner", "7-day personalized Indian diet plans tailored to your goal"),
-        ("🏋️", "AI Workout Generator", "Push-Pull-Legs splits customized for your experience level"),
-        ("🤖", "AI Trainer Chat", "Ask anything to your 24/7 personal AI gym trainer"),
-        ("📊", "Progress Tracker", "Log daily weight & calories, visualize your transformation"),
-        ("🔥", "BMR & Calorie Calc", "Scientifically calculated daily calorie and protein targets"),
-        ("🔐", "Secure Accounts", "Your data is safely stored in a private local database"),
+        ("🔐", "Secure Login", "bcrypt password hashing"),
+        ("🧮", "BMI & BMR", "Mifflin-St Jeor formula"),
+        ("🥗", "AI Diet Plan", "7-day Indian meal plan"),
+        ("🏋️", "AI Workout", "Push Pull Legs program"),
+        ("🤖", "AI Chatbot", "Personal trainer chat"),
+        ("📈", "Progress", "Plotly chart tracking"),
     ]
-    cols = [col1, col2, col3, col1, col2, col3]
-    for (icon, title, desc), col in zip(features, cols):
+    cols = st.columns(6)
+    for col, (icon, title, desc) in zip(cols, features):
         with col:
             st.markdown(f"""
-            <div class='metric-card'>
-                <div style='font-size:2rem;'>{icon}</div>
-                <div style='font-family:Oswald,sans-serif; font-size:1.1rem;
-                            color:#FF6B35; margin:8px 0 6px 0; letter-spacing:1px;'>
-                    {title}
-                </div>
-                <div style='font-size:0.82rem; color:#9090AA; line-height:1.5;'>{desc}</div>
+            <div style="background:rgba(255,107,53,0.05); border:1px solid rgba(255,107,53,0.2);
+                        border-radius:10px; padding:1rem; text-align:center;
+                        animation: fadeInUp 0.8s ease;
+                        transition: all 0.3s ease; cursor:pointer;"
+                 onmouseover="this.style.background='rgba(255,107,53,0.12)';this.style.transform='translateY(-5px)'"
+                 onmouseout="this.style.background='rgba(255,107,53,0.05)';this.style.transform='translateY(0)'">
+                <div style="font-size:2rem; margin-bottom:0.5rem;">{icon}</div>
+                <div style="color:#FF6B35; font-weight:700; font-size:0.9rem;">{title}</div>
+                <div style="color:#666; font-size:0.75rem; margin-top:0.3rem;">{desc}</div>
             </div>
             """, unsafe_allow_html=True)
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    if not st.session_state.logged_in:
-        st.markdown("""<div class='info-box'>
-            👋 <strong>Welcome!</strong> Please <strong>Register or Login</strong> from the sidebar to get started.
-        </div>""", unsafe_allow_html=True)
-    else:
-        profile = get_profile_dict()
-        if not profile:
-            st.markdown("""<div class='warning-box'>
-                ⚠️ Your profile is incomplete. Go to <strong>My Profile</strong> to set up your details.
-            </div>""", unsafe_allow_html=True)
-        else:
-            st.markdown(f"""<div class='success-box'>
-                ✅ Welcome back, <strong>{profile['name']}</strong>! Goal: <strong>{profile['goal']}</strong> |
-                Daily Target: <strong>{profile['daily_calories']:.0f} kcal</strong> |
-                Protein: <strong>{profile['protein_req']:.0f}g</strong>
-            </div>""", unsafe_allow_html=True)
-
-
-# ---------------------------------------------------------------------------
-# Page: Login / Register
-# ---------------------------------------------------------------------------
-def page_auth():
-    st.markdown("<div class='section-header'>🔐 Account Access</div>", unsafe_allow_html=True)
-    tab1, tab2 = st.tabs(["🔑 Login", "📝 Register"])
-
-    with tab1:
+    if not st.session_state.user_id:
         st.markdown("<br>", unsafe_allow_html=True)
-        with st.form("login_form"):
-            email = st.text_input("Email Address", placeholder="your@email.com")
-            password = st.text_input("Password", type="password", placeholder="••••••••")
-            submitted = st.form_submit_button("🔑 Login")
-        if submitted:
-            user, msg = auth_module.login_user(email, password)
-            if user:
-                st.session_state.logged_in = True
-                st.session_state.user_id = user["id"]
-                st.session_state.user_name = user["name"]
-                st.session_state.current_page = "🏠 Home"
-                st.success(msg)
+        c1, c2, c3 = st.columns([2, 1, 2])
+        with c2:
+            if st.button("🚀 GET STARTED", use_container_width=True):
+                st.session_state.page = "Register"
                 st.rerun()
-            else:
-                st.error(msg)
-
-    with tab2:
-        st.markdown("<br>", unsafe_allow_html=True)
-        with st.form("register_form"):
-            name = st.text_input("Full Name", placeholder="Gnaneswar")
-            email = st.text_input("Email Address", placeholder="your@email.com")
-            password = st.text_input("Password", type="password", placeholder="Min. 6 characters")
-            confirm = st.text_input("Confirm Password", type="password", placeholder="Re-enter password")
-            submitted = st.form_submit_button("🚀 Create Account")
-        if submitted:
-            success, msg = auth_module.register_user(name, email, password, confirm)
-            if success:
-                st.success(f"✅ {msg} Please login.")
-            else:
-                st.error(msg)
 
 
-# ---------------------------------------------------------------------------
-# Page: Profile
-# ---------------------------------------------------------------------------
-def page_profile():
-    st.markdown("<div class='section-header'>👤 My Fitness Profile</div>", unsafe_allow_html=True)
-    existing = db.get_profile(st.session_state.user_id)
+# ════════════════════════════════════════════════════════════════
+# PAGE: LOGIN
+# ════════════════════════════════════════════════════════════════
+elif st.session_state.page == "Login":
+    hero_title("WELCOME BACK", "Login to your account")
 
-    with st.form("profile_form"):
-        col1, col2 = st.columns(2)
-        with col1:
-            age = st.number_input("Age (years)", min_value=10, max_value=90,
-                                  value=int(existing["age"]) if existing and existing["age"] else 25)
-            height = st.number_input("Height (cm)", min_value=100.0, max_value=250.0,
-                                     value=float(existing["height"]) if existing and existing["height"] else 170.0,
-                                     step=0.5)
-            goal = st.selectbox("Fitness Goal", ["Bulking", "Cutting", "Maintain"],
-                                index=["Bulking", "Cutting", "Maintain"].index(existing["goal"])
-                                if existing and existing["goal"] else 0)
-        with col2:
-            gender = st.selectbox("Gender", ["Male", "Female"],
-                                  index=["Male", "Female"].index(existing["gender"])
-                                  if existing and existing["gender"] else 0)
-            weight = st.number_input("Weight (kg)", min_value=30.0, max_value=300.0,
-                                     value=float(existing["weight"]) if existing and existing["weight"] else 70.0,
-                                     step=0.5)
-            experience = st.selectbox("Experience Level", ["Beginner", "Intermediate", "Advanced"],
-                                      index=["Beginner", "Intermediate", "Advanced"].index(existing["experience"])
-                                      if existing and existing["experience"] else 0)
-        activity = st.selectbox("Activity Level", [
-            "Sedentary (little/no exercise)",
-            "Light (1-3 days/week)",
-            "Moderate (3-5 days/week)",
-            "Active (6-7 days/week)",
-            "Very Active (2x/day)",
-        ], index=2)
-        submitted = st.form_submit_button("💾 Save Profile & Calculate")
-
-    if submitted:
-        results = calc.full_calculation(weight, height, age, gender, goal, experience, activity)
-        db.save_profile(
-            user_id=st.session_state.user_id,
-            age=age, gender=gender, height=height, weight=weight,
-            goal=goal, experience=experience,
-            bmi=results["bmi"], bmr=results["bmr"],
-            daily_calories=results["daily_calories"],
-            protein_req=results["protein_req"],
-        )
-        st.success("✅ Profile saved successfully!")
-        st.markdown("<br>", unsafe_allow_html=True)
-        m1, m2, m3, m4 = st.columns(4)
-        with m1:
-            st.markdown(f"""<div class='metric-card'>
-                <div class='metric-value'>{results['bmi']}</div>
-                <div class='metric-label'>BMI — {results['bmi_category']}</div></div>""",
-                unsafe_allow_html=True)
-        with m2:
-            st.markdown(f"""<div class='metric-card'>
-                <div class='metric-value'>{int(results['bmr'])}</div>
-                <div class='metric-label'>BMR (kcal/day)</div></div>""", unsafe_allow_html=True)
-        with m3:
-            st.markdown(f"""<div class='metric-card'>
-                <div class='metric-value'>{int(results['daily_calories'])}</div>
-                <div class='metric-label'>Target Calories ({goal})</div></div>""", unsafe_allow_html=True)
-        with m4:
-            st.markdown(f"""<div class='metric-card'>
-                <div class='metric-value'>{int(results['protein_req'])}g</div>
-                <div class='metric-label'>Daily Protein</div></div>""", unsafe_allow_html=True)
-
-    elif existing:
-        st.markdown("<br>", unsafe_allow_html=True)
-        m1, m2, m3, m4 = st.columns(4)
-        with m1:
-            st.markdown(f"""<div class='metric-card'>
-                <div class='metric-value'>{existing['bmi']}</div>
-                <div class='metric-label'>BMI</div></div>""", unsafe_allow_html=True)
-        with m2:
-            st.markdown(f"""<div class='metric-card'>
-                <div class='metric-value'>{int(existing['bmr'])}</div>
-                <div class='metric-label'>BMR (kcal)</div></div>""", unsafe_allow_html=True)
-        with m3:
-            st.markdown(f"""<div class='metric-card'>
-                <div class='metric-value'>{int(existing['daily_calories'])}</div>
-                <div class='metric-label'>Daily Target (kcal)</div></div>""", unsafe_allow_html=True)
-        with m4:
-            st.markdown(f"""<div class='metric-card'>
-                <div class='metric-value'>{int(existing['protein_req'])}g</div>
-                <div class='metric-label'>Daily Protein</div></div>""", unsafe_allow_html=True)
-
-
-# ---------------------------------------------------------------------------
-# Page: AI Diet Planner
-# ---------------------------------------------------------------------------
-def page_diet():
-    st.markdown("<div class='section-header'>🥗 AI Diet Planner</div>", unsafe_allow_html=True)
-    profile = get_profile_dict()
-    if not profile:
-        st.markdown("""<div class='warning-box'>
-            ⚠️ Please complete your <strong>Profile</strong> first to generate a personalized diet plan.
-        </div>""", unsafe_allow_html=True)
-        return
-
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        st.markdown(f"""<div class='info-box'>
-            ✅ Goal: <strong>{profile['goal']}</strong> |
-            Target: <strong>{int(profile['daily_calories'])} kcal</strong> |
-            Protein: <strong>{int(profile['protein_req'])}g</strong>
-        </div>""", unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        generate = st.button("🥗 Generate 7-Day Diet Plan", key="gen_diet")
-
-    if generate:
-        with st.spinner("🧠 AI is crafting your personalized Indian diet plan..."):
-            plan = ai.generate_diet_plan(profile)
-            st.session_state.diet_plan = plan
-
-    if st.session_state.diet_plan:
-        st.markdown("<div class='ai-output'>", unsafe_allow_html=True)
-        st.markdown(st.session_state.diet_plan)
-        st.markdown("</div>", unsafe_allow_html=True)
-        st.download_button(
-            label="⬇️ Download Diet Plan (TXT)",
-            data=st.session_state.diet_plan,
-            file_name="diet_plan_gnaneswar.txt",
-            mime="text/plain"
-        )
-
-
-# ---------------------------------------------------------------------------
-# Page: AI Workout Generator
-# ---------------------------------------------------------------------------
-def page_workout():
-    st.markdown("<div class='section-header'>🏋️ AI Workout Generator</div>", unsafe_allow_html=True)
-    profile = get_profile_dict()
-    if not profile:
-        st.markdown("""<div class='warning-box'>
-            ⚠️ Please complete your <strong>Profile</strong> first.
-        </div>""", unsafe_allow_html=True)
-        return
-
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        st.markdown(f"""<div class='info-box'>
-            ✅ Goal: <strong>{profile['goal']}</strong> |
-            Experience: <strong>{profile['experience']}</strong> |
-            Gender: <strong>{profile['gender']}</strong>
-        </div>""", unsafe_allow_html=True)
-    with col2:
-        generate = st.button("🏋️ Generate Workout Plan", key="gen_workout")
-
-    if generate:
-        with st.spinner("💪 AI is building your Push-Pull-Legs program..."):
-            plan = ai.generate_workout_plan(profile)
-            st.session_state.workout_plan = plan
-
-    if st.session_state.workout_plan:
-        st.markdown("<div class='ai-output'>", unsafe_allow_html=True)
-        st.markdown(st.session_state.workout_plan)
-        st.markdown("</div>", unsafe_allow_html=True)
-        st.download_button(
-            label="⬇️ Download Workout Plan (TXT)",
-            data=st.session_state.workout_plan,
-            file_name="workout_plan_gnaneswar.txt",
-            mime="text/plain"
-        )
-
-
-# ---------------------------------------------------------------------------
-# Page: AI Trainer Chat
-# ---------------------------------------------------------------------------
-def page_chat():
-    st.markdown("<div class='section-header'>🤖 AI Trainer Chat</div>", unsafe_allow_html=True)
-    profile = get_profile_dict()
-
-    if not st.session_state.chat_loaded:
-        db_history = db.get_chat_history(st.session_state.user_id, limit=20)
-        st.session_state.chat_messages = [
-            {"role": r["role"], "message": r["message"]} for r in db_history
-        ]
-        st.session_state.chat_loaded = True
-
-    st.markdown("""<div class='info-box'>
-        💬 Ask your AI trainer anything about fitness, nutrition, supplements, or training.
-    </div>""", unsafe_allow_html=True)
-
-    # Display history
-    if not st.session_state.chat_messages:
         st.markdown("""
-        <div style='text-align:center; padding:40px; color:#444;'>
-            <div style='font-size:3rem;'>🤖</div>
-            <div style='margin-top:12px;'>Start a conversation! Examples:</div>
-            <div style='margin-top:8px; font-size:0.8rem; color:#555;'>
-                "How to build chest?" • "Best foods for bulking?" • "Should I do cardio?"
-            </div>
+        <div style="background:linear-gradient(135deg, rgba(255,107,53,0.08), rgba(255,107,53,0.02));
+                    border:1px solid rgba(255,107,53,0.25); border-radius:16px;
+                    padding:2rem; animation: fadeInUp 0.6s ease;">
+        """, unsafe_allow_html=True)
+
+        st.markdown("<div style='text-align:center; font-size:3rem;'>🔐</div>", unsafe_allow_html=True)
+
+        with st.form("login_form"):
+            email    = st.text_input("📧 Email Address", placeholder="your@email.com")
+            password = st.text_input("🔑 Password", type="password", placeholder="Enter password")
+            st.markdown("<br>", unsafe_allow_html=True)
+            submitted = st.form_submit_button("🚀 LOGIN", use_container_width=True)
+
+        if submitted:
+            if email and password:
+                with st.spinner("🔄 Authenticating..."):
+                    success, user, msg = login_user(email, password)
+                if success:
+                    st.session_state.user_id   = user['id']
+                    st.session_state.user_name = user['name']
+                    st.success(f"✅ Welcome back, {user['name']}!")
+                    st.balloons()
+                    import time; time.sleep(1)
+                    st.session_state.page = "Home"
+                    st.rerun()
+                else:
+                    st.error(f"❌ {msg}")
+            else:
+                st.warning("⚠️ Please fill all fields!")
+
+        st.markdown("""
+        <div style="text-align:center; color:#888; margin-top:1rem; font-size:0.9rem;">
+            Don't have an account?
+            <span style="color:#FF6B35; font-weight:700;">Register →</span>
         </div>
         """, unsafe_allow_html=True)
-    else:
-        for msg in st.session_state.chat_messages:
-            if msg["role"] == "user":
-                st.markdown(f"""<div class='chat-user'>
-                    <div class='chat-label'>👤 You</div>{msg['message']}</div>""",
-                    unsafe_allow_html=True)
-            else:
-                st.markdown(f"""<div class='chat-bot'>
-                    <div class='chat-label'>🤖 AI Trainer</div>{msg['message']}</div>""",
-                    unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    col1, col2 = st.columns([4, 1])
-    with col1:
-        user_input = st.text_input("Message", placeholder="Ask your trainer anything...",
-                                   label_visibility="collapsed", key="chat_input")
+
+# ════════════════════════════════════════════════════════════════
+# PAGE: REGISTER
+# ════════════════════════════════════════════════════════════════
+elif st.session_state.page == "Register":
+    hero_title("CREATE ACCOUNT", "Join Gnaneswar Fitness AI")
+
+    col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        send = st.button("Send 💬", key="send_chat")
+        st.markdown("""
+        <div style="background:linear-gradient(135deg, rgba(255,107,53,0.08), rgba(255,107,53,0.02));
+                    border:1px solid rgba(255,107,53,0.25); border-radius:16px;
+                    padding:2rem; animation: fadeInUp 0.6s ease;">
+        """, unsafe_allow_html=True)
 
-    col3, col4 = st.columns([3, 1])
-    with col4:
-        if st.button("🗑️ Clear Chat"):
-            db.clear_chat_history(st.session_state.user_id)
-            st.session_state.chat_messages = []
-            st.rerun()
+        st.markdown("<div style='text-align:center; font-size:3rem;'>📝</div>", unsafe_allow_html=True)
 
-    if send and user_input.strip():
-        db.save_chat(st.session_state.user_id, "user", user_input.strip())
-        st.session_state.chat_messages.append({"role": "user", "message": user_input.strip()})
-        with st.spinner("🤖 Trainer is thinking..."):
-            response = ai.chat_with_trainer(
-                user_input.strip(),
-                st.session_state.chat_messages[-10:],
-                profile
-            )
-        db.save_chat(st.session_state.user_id, "assistant", response)
-        st.session_state.chat_messages.append({"role": "assistant", "message": response})
+        with st.form("register_form"):
+            name     = st.text_input("👤 Full Name",      placeholder="Your full name")
+            email    = st.text_input("📧 Email Address",  placeholder="your@email.com")
+            password = st.text_input("🔑 Password",       type="password", placeholder="Min 6 characters")
+            confirm  = st.text_input("🔑 Confirm Password", type="password", placeholder="Repeat password")
+            st.markdown("<br>", unsafe_allow_html=True)
+            submitted = st.form_submit_button("✨ CREATE ACCOUNT", use_container_width=True)
+
+        if submitted:
+            if name and email and password and confirm:
+                if password != confirm:
+                    st.error("❌ Passwords do not match!")
+                else:
+                    with st.spinner("⚙️ Creating your account..."):
+                        success, msg = register_user(name, email, password)
+                    if success:
+                        st.success(f"🎉 {msg} Please login!")
+                        st.balloons()
+                    else:
+                        st.error(f"❌ {msg}")
+            else:
+                st.warning("⚠️ Please fill all fields!")
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+
+# ════════════════════════════════════════════════════════════════
+# CHECK LOGIN FOR PROTECTED PAGES
+# ════════════════════════════════════════════════════════════════
+elif not st.session_state.user_id:
+    st.warning("⚠️ Please login first!")
+    if st.button("🔐 Go to Login"):
+        st.session_state.page = "Login"
         st.rerun()
 
 
-# ---------------------------------------------------------------------------
-# Page: Progress Tracker
-# ---------------------------------------------------------------------------
-def page_progress():
-    st.markdown("<div class='section-header'>📊 Progress Tracker</div>", unsafe_allow_html=True)
-    profile = get_profile_dict()
-    target_calories = profile.get("daily_calories") if profile else None
+# ════════════════════════════════════════════════════════════════
+# PAGE: PROFILE
+# ════════════════════════════════════════════════════════════════
+elif st.session_state.page == "Profile":
+    hero_title("MY PROFILE", "Your fitness details and calculations")
+    section_header("Fitness Profile", "👤")
 
-    st.markdown("#### 📝 Log Today's Progress")
-    with st.form("progress_form"):
-        col1, col2 = st.columns(2)
-        with col1:
-            log_date = st.date_input("Date", value=date.today())
-            log_weight = st.number_input("Body Weight (kg)", min_value=20.0,
-                                         max_value=300.0, step=0.1,
-                                         value=profile.get("weight", 70.0) if profile else 70.0)
-        with col2:
-            log_calories = st.number_input("Calories Eaten (kcal)", min_value=0,
-                                            max_value=10000, step=50,
-                                            value=int(target_calories) if target_calories else 2000)
-            workout_done = st.text_input("Workout Done", placeholder="e.g. Push Day — Chest & Triceps")
-        notes = st.text_area("Notes (optional)", placeholder="How did you feel?", height=80)
-        submitted = st.form_submit_button("💾 Log Progress")
+    existing = get_profile(st.session_state.user_id)
+
+    with st.form("profile_form"):
+        c1, c2 = st.columns(2)
+        with c1:
+            age    = st.number_input("🎂 Age",    min_value=10, max_value=100, value=int(existing['age']) if existing else 22)
+            weight = st.number_input("⚖️ Weight (kg)", min_value=30.0, max_value=300.0, value=float(existing['weight']) if existing else 70.0, step=0.5)
+            goal   = st.selectbox("🎯 Goal", ["Bulking (Gain Muscle)", "Cutting (Lose Fat)", "Maintain Weight"],
+                                  index=["Bulking (Gain Muscle)", "Cutting (Lose Fat)", "Maintain Weight"].index(existing['goal']) if existing else 0)
+            activity = st.selectbox("🏃 Activity Level",
+                ["Sedentary (No exercise)", "Lightly Active (1-3 days/week)",
+                 "Moderately Active (3-5 days/week)", "Very Active (6-7 days/week)", "Extra Active (Physical job)"])
+        with c2:
+            gender = st.selectbox("⚤ Gender", ["Male", "Female"],
+                                  index=0 if not existing or existing['gender'] == 'Male' else 1)
+            height = st.number_input("📏 Height (cm)", min_value=100.0, max_value=250.0, value=float(existing['height']) if existing else 170.0, step=0.5)
+            experience = st.selectbox("🏆 Experience", ["Beginner", "Intermediate", "Advanced"],
+                                      index=["Beginner", "Intermediate", "Advanced"].index(existing['experience']) if existing else 0)
+
+        submitted = st.form_submit_button("💾 SAVE PROFILE", use_container_width=True)
 
     if submitted:
-        db.log_progress(st.session_state.user_id, str(log_date),
-                        log_weight, log_calories, workout_done, notes)
-        st.success("✅ Progress logged successfully!")
-        st.rerun()
+        with st.spinner("⚙️ Calculating your fitness data..."):
+            calcs = get_all_calculations(weight, height, age, gender, activity, goal, experience)
+            save_profile(st.session_state.user_id, age, gender, height, weight,
+                         goal, experience, activity,
+                         calcs['bmi'], calcs['bmr'],
+                         calcs['daily_calories'], calcs['protein_req'])
+        st.success("✅ Profile saved successfully!")
 
-    st.markdown("<hr style='border-color:rgba(255,107,53,0.2);margin:24px 0;'>", unsafe_allow_html=True)
-
-    df = pt.get_progress_dataframe(st.session_state.user_id)
-    if df.empty:
-        st.markdown("""<div class='info-box'>
-            📋 No progress data yet. Log your first entry above!
-        </div>""", unsafe_allow_html=True)
-        return
-
-    st.markdown("#### 📈 Your Progress Charts")
-    summary = pt.get_weekly_summary(df)
-    if summary:
-        s1, s2, s3, s4 = st.columns(4)
-        with s1:
-            st.markdown(f"""<div class='metric-card'>
-                <div class='metric-value'>{summary.get('entries', 0)}</div>
-                <div class='metric-label'>Entries (7 days)</div></div>""", unsafe_allow_html=True)
-        with s2:
-            w_change = summary.get("weight_change", 0) or 0
-            color = "#2ECC40" if w_change < 0 else "#FF6B35" if w_change > 0 else "#9090AA"
-            arrow = "↓" if w_change < 0 else "↑" if w_change > 0 else "→"
-            st.markdown(f"""<div class='metric-card'>
-                <div class='metric-value' style='color:{color};'>{arrow} {abs(w_change)} kg</div>
-                <div class='metric-label'>Weight Change (7d)</div></div>""", unsafe_allow_html=True)
-        with s3:
-            avg_cal = summary.get("avg_calories", 0) or 0
-            st.markdown(f"""<div class='metric-card'>
-                <div class='metric-value'>{avg_cal:.0f}</div>
-                <div class='metric-label'>Avg Calories/Day</div></div>""", unsafe_allow_html=True)
-        with s4:
-            st.markdown(f"""<div class='metric-card'>
-                <div class='metric-value'>{summary.get('workouts_done', 0)}</div>
-                <div class='metric-label'>Workouts Logged</div></div>""", unsafe_allow_html=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    weight_fig = pt.plot_weight_progress(df)
-    if weight_fig:
-        st.plotly_chart(weight_fig, use_container_width=True)
-
-    cal_fig = pt.plot_calorie_tracking(df, target_calories)
-    if cal_fig:
-        st.plotly_chart(cal_fig, use_container_width=True)
-
-    with st.expander("📋 View Raw Progress Data"):
-        st.dataframe(df.sort_values("Date", ascending=False), use_container_width=True)
+        section_header("Your Fitness Results", "🧮")
+        c1, c2, c3, c4 = st.columns(4)
+        with c1: st.metric("BMI", f"{calcs['bmi']}", calcs['bmi_category'])
+        with c2: st.metric("BMR", f"{calcs['bmr']} kcal", "Daily Base Calories")
+        with c3: st.metric("Daily Calories", f"{calcs['daily_calories']} kcal", goal)
+        with c4: st.metric("Protein Target", f"{calcs['protein_req']}g", "Per Day")
 
 
-# ---------------------------------------------------------------------------
-# Main router
-# ---------------------------------------------------------------------------
-def main():
-    render_sidebar()
-    page = st.session_state.current_page
+# ════════════════════════════════════════════════════════════════
+# PAGE: DIET PLAN
+# ════════════════════════════════════════════════════════════════
+elif st.session_state.page == "Diet":
+    hero_title("AI DIET PLANNER", "Personalized 7-Day Indian Diet Plan")
+    profile = get_profile(st.session_state.user_id)
+    if not profile:
+        st.warning("⚠️ Please create your profile first!")
+    else:
+        section_header("Your Diet Stats", "🧮")
+        c1, c2, c3 = st.columns(3)
+        with c1: st.metric("Daily Calories", f"{profile['daily_calories']} kcal")
+        with c2: st.metric("Protein Target", f"{profile['protein_req']}g/day")
+        with c3: st.metric("Goal", profile['goal'])
 
-    protected = ["👤 My Profile", "🥗 AI Diet Planner", "🏋️ AI Workout Generator",
-                 "🤖 AI Trainer Chat", "📊 Progress Tracker"]
-
-    if page in protected and not st.session_state.logged_in:
-        st.warning("⚠️ Please login to access this page.")
-        page_auth()
-        return
-
-    if page == "🏠 Home":
-        page_home()
-    elif page == "🔐 Login / Register":
-        page_auth()
-    elif page == "👤 My Profile":
-        page_profile()
-    elif page == "🥗 AI Diet Planner":
-        page_diet()
-    elif page == "🏋️ AI Workout Generator":
-        page_workout()
-    elif page == "🤖 AI Trainer Chat":
-        page_chat()
-    elif page == "📊 Progress Tracker":
-        page_progress()
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🥗 GENERATE MY DIET PLAN", use_container_width=True):
+            with st.spinner("🤖 LLaMA 3.1 is creating your personalized diet plan..."):
+                plan = generate_diet_plan(profile, st.session_state.user_name)
+            section_header("Your 7-Day Diet Plan", "🥗")
+            st.markdown(f"""
+            <div style="background:rgba(255,107,53,0.05); border:1px solid rgba(255,107,53,0.2);
+                        border-radius:12px; padding:1.5rem; white-space:pre-wrap;
+                        color:#E0E0E0; line-height:1.8; font-size:0.95rem;
+                        animation: fadeInUp 0.5s ease;">
+                {plan}
+            </div>
+            """, unsafe_allow_html=True)
+            st.download_button("📥 Download Diet Plan", plan,
+                               file_name="my_diet_plan.txt", use_container_width=True)
 
 
-if __name__ == "__main__":
-    main()
+# ════════════════════════════════════════════════════════════════
+# PAGE: WORKOUT
+# ════════════════════════════════════════════════════════════════
+elif st.session_state.page == "Workout":
+    hero_title("AI WORKOUT GENERATOR", "Push Pull Legs 6-Day Program")
+    profile = get_profile(st.session_state.user_id)
+    if not profile:
+        st.warning("⚠️ Please create your profile first!")
+    else:
+        section_header("Your Training Stats", "🏋️")
+        c1, c2, c3 = st.columns(3)
+        with c1: st.metric("Experience", profile['experience'])
+        with c2: st.metric("Goal",       profile['goal'])
+        with c3: st.metric("Weight",     f"{profile['weight']} kg")
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🏋️ GENERATE MY WORKOUT", use_container_width=True):
+            with st.spinner("🤖 LLaMA 3.1 is building your workout program..."):
+                workout = generate_workout_plan(profile, st.session_state.user_name)
+            section_header("Your 6-Day Workout Plan", "🏋️")
+            st.markdown(f"""
+            <div style="background:rgba(255,107,53,0.05); border:1px solid rgba(255,107,53,0.2);
+                        border-radius:12px; padding:1.5rem; white-space:pre-wrap;
+                        color:#E0E0E0; line-height:1.8; font-size:0.95rem;
+                        animation: fadeInUp 0.5s ease;">
+                {workout}
+            </div>
+            """, unsafe_allow_html=True)
+            st.download_button("📥 Download Workout Plan", workout,
+                               file_name="my_workout_plan.txt", use_container_width=True)
+
+
+# ════════════════════════════════════════════════════════════════
+# PAGE: AI TRAINER CHAT
+# ════════════════════════════════════════════════════════════════
+elif st.session_state.page == "Chat":
+    hero_title("AI TRAINER CHAT", "Your Personal Fitness Coach")
+    profile = get_profile(st.session_state.user_id)
+    if not profile:
+        st.warning("⚠️ Please create your profile first!")
+    else:
+        history = get_chat_history(st.session_state.user_id, limit=20)
+        section_header("Conversation", "💬")
+
+        if not history:
+            st.markdown("""
+            <div style="text-align:center; padding:2rem; color:#888;">
+                <div style="font-size:3rem; margin-bottom:1rem;">🤖</div>
+                <div>Start chatting with your AI trainer!</div>
+                <div style="font-size:0.85rem; margin-top:0.5rem;">
+                    Ask about diet, workout, supplements, or anything fitness!
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        for msg in history:
+            chat_bubble(msg['role'], msg['message'])
+
+        with st.form("chat_form", clear_on_submit=True):
+            user_input = st.text_input("💬 Ask your AI trainer...",
+                                        placeholder="e.g. What should I eat after workout?")
+            submitted = st.form_submit_button("📤 SEND", use_container_width=True)
+
+        if submitted and user_input:
+            save_chat_message(st.session_state.user_id, "user", user_input)
+            with st.spinner("🤖 AI Trainer is thinking..."):
+                response = chat_with_trainer(
+                    user_input, profile,
+                    st.session_state.user_name, history
+                )
+            save_chat_message(st.session_state.user_id, "assistant", response)
+            st.rerun()
+
+
+# ════════════════════════════════════════════════════════════════
+# PAGE: PROGRESS TRACKER
+# ════════════════════════════════════════════════════════════════
+elif st.session_state.page == "Progress":
+    hero_title("PROGRESS TRACKER", "Track your fitness journey")
+    profile = get_profile(st.session_state.user_id)
+    if not profile:
+        st.warning("⚠️ Please create your profile first!")
+    else:
+        section_header("Log Today", "📝")
+        with st.form("progress_form"):
+            c1, c2, c3 = st.columns(3)
+            with c1: log_date    = st.date_input("📅 Date", value=date.today())
+            with c2: log_weight  = st.number_input("⚖️ Weight (kg)", min_value=30.0, max_value=300.0,
+                                                    value=float(profile['weight']), step=0.1)
+            with c3: log_cal     = st.number_input("🔥 Calories Eaten", min_value=0.0,
+                                                    value=float(profile['daily_calories']), step=50.0)
+            workout_done = st.checkbox("✅ Completed workout today?")
+            notes        = st.text_area("📝 Notes (optional)", placeholder="How did you feel today?", height=80)
+            submitted    = st.form_submit_button("💾 SAVE TODAY'S LOG", use_container_width=True)
+
+        if submitted:
+            save_progress(st.session_state.user_id, log_date, log_weight,
+                          log_cal, workout_done, notes)
+            st.success("✅ Progress logged successfully!")
+            st.rerun()
+
+        section_header("Progress Charts", "📈")
+        fig_w, fig_c, stats = get_progress_charts(
+            st.session_state.user_id, profile['daily_calories']
+        )
+
+        if stats:
+            c1, c2, c3, c4 = st.columns(4)
+            with c1: st.metric("Total Days Logged", stats['total_days'])
+            with c2: st.metric("Current Weight",    f"{stats['latest_weight']} kg",
+                               f"{stats['weight_change']:+.1f} kg")
+            with c3: st.metric("Avg Calories",      f"{stats['avg_calories']} kcal")
+            with c4: st.metric("Workouts Done",     stats['workouts_done'])
+
+            st.plotly_chart(fig_w, use_container_width=True)
+            st.plotly_chart(fig_c, use_container_width=True)
+        else:
+            st.info("📊 Log some progress entries to see your charts!")

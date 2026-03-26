@@ -1,96 +1,67 @@
-"""
-fitness_calc.py
-All fitness calculation logic using scientifically validated formulas.
-"""
-
-
-def calculate_bmi(weight_kg: float, height_cm: float) -> float:
-    """Body Mass Index"""
+def calculate_bmi(weight, height_cm):
     height_m = height_cm / 100
-    return round(weight_kg / (height_m ** 2), 1)
+    bmi = weight / (height_m ** 2)
+    return round(bmi, 1)
 
 
-def bmi_category(bmi: float) -> str:
+def get_bmi_category(bmi):
     if bmi < 18.5:
-        return "Underweight 🟡"
-    elif bmi < 25.0:
-        return "Normal Weight 🟢"
-    elif bmi < 30.0:
-        return "Overweight 🟠"
+        return "Underweight", "⚠️"
+    elif bmi < 25:
+        return "Normal Weight", "✅"
+    elif bmi < 30:
+        return "Overweight", "⚠️"
     else:
-        return "Obese 🔴"
+        return "Obese", "❌"
 
 
-def calculate_bmr(weight_kg: float, height_cm: float, age: int, gender: str) -> float:
-    """
-    Mifflin-St Jeor Equation (most accurate for general population)
-    Male:   BMR = 10*W + 6.25*H - 5*A + 5
-    Female: BMR = 10*W + 6.25*H - 5*A - 161
-    """
-    bmr = 10 * weight_kg + 6.25 * height_cm - 5 * age
+def calculate_bmr(weight, height_cm, age, gender):
     if gender == "Male":
-        bmr += 5
+        bmr = (10 * weight) + (6.25 * height_cm) - (5 * age) + 5
     else:
-        bmr -= 161
-    return round(bmr, 0)
+        bmr = (10 * weight) + (6.25 * height_cm) - (5 * age) - 161
+    return round(bmr, 1)
 
 
-def calculate_tdee(bmr: float, activity_level: str = "Moderate") -> float:
-    """
-    Total Daily Energy Expenditure using activity multipliers.
-    """
+def calculate_tdee(bmr, activity_level):
     multipliers = {
-        "Sedentary (little/no exercise)": 1.2,
-        "Light (1-3 days/week)": 1.375,
-        "Moderate (3-5 days/week)": 1.55,
-        "Active (6-7 days/week)": 1.725,
-        "Very Active (2x/day)": 1.9,
+        "Sedentary (No exercise)": 1.2,
+        "Lightly Active (1-3 days/week)": 1.375,
+        "Moderately Active (3-5 days/week)": 1.55,
+        "Very Active (6-7 days/week)": 1.725,
+        "Extra Active (Physical job)": 1.9
     }
     multiplier = multipliers.get(activity_level, 1.55)
-    return round(bmr * multiplier, 0)
+    return round(bmr * multiplier, 1)
 
 
-def calculate_goal_calories(tdee: float, goal: str) -> float:
-    """Adjust TDEE based on fitness goal."""
-    if goal == "Bulking":
-        return round(tdee + 400, 0)
-    elif goal == "Cutting":
-        return round(tdee - 400, 0)
-    else:  # Maintain
-        return round(tdee, 0)
-
-
-def calculate_protein(weight_kg: float, goal: str, experience: str) -> float:
-    """
-    Protein requirements:
-    - Cutting / Advanced: 2.2g per kg
-    - Bulking / Intermediate: 2.0g per kg
-    - Maintain / Beginner: 1.6g per kg
-    """
-    if goal == "Cutting" or experience == "Advanced":
-        multiplier = 2.2
-    elif goal == "Bulking" or experience == "Intermediate":
-        multiplier = 2.0
+def calculate_goal_calories(tdee, goal):
+    if goal == "Bulking (Gain Muscle)":
+        return round(tdee + 400, 1)
+    elif goal == "Cutting (Lose Fat)":
+        return round(tdee - 400, 1)
     else:
-        multiplier = 1.6
-    return round(weight_kg * multiplier, 0)
+        return tdee
 
 
-def full_calculation(weight: float, height: float, age: int,
-                     gender: str, goal: str, experience: str,
-                     activity_level: str = "Moderate (3-5 days/week)") -> dict:
-    """Run all calculations and return as a dictionary."""
-    bmi = calculate_bmi(weight, height)
-    bmr = calculate_bmr(weight, height, age, gender)
+def calculate_protein(weight, goal, experience):
+    if goal == "Cutting (Lose Fat)" or experience == "Advanced":
+        return round(weight * 2.2, 1)
+    elif goal == "Bulking (Gain Muscle)":
+        return round(weight * 2.0, 1)
+    else:
+        return round(weight * 1.6, 1)
+
+
+def get_all_calculations(weight, height_cm, age, gender, activity_level, goal, experience):
+    bmi = calculate_bmi(weight, height_cm)
+    bmi_cat, bmi_icon = get_bmi_category(bmi)
+    bmr = calculate_bmr(weight, height_cm, age, gender)
     tdee = calculate_tdee(bmr, activity_level)
     daily_calories = calculate_goal_calories(tdee, goal)
     protein = calculate_protein(weight, goal, experience)
-
     return {
-        "bmi": bmi,
-        "bmi_category": bmi_category(bmi),
-        "bmr": bmr,
-        "tdee": tdee,
-        "daily_calories": daily_calories,
-        "protein_req": protein,
+        'bmi': bmi, 'bmi_category': bmi_cat, 'bmi_icon': bmi_icon,
+        'bmr': bmr, 'tdee': tdee,
+        'daily_calories': daily_calories, 'protein_req': protein
     }

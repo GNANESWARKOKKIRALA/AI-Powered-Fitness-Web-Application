@@ -1,6 +1,6 @@
 # 💪 Gnaneswar Fitness AI
+AI-Powered-Fitness-Web-Application
 
-A production-level AI Fitness Web Application built with Python + Streamlit.
 
 ## Features
 - 🔐 Secure user authentication (bcrypt hashing)

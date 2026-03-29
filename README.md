@@ -5,7 +5,7 @@ A production-level AI Fitness Web Application built with Python + Streamlit.
 ## Features
 - 🔐 Secure user authentication (bcrypt hashing)
 - 🏋️ AI Workout Generator (6 splits: PPL, Bro, Arnold, Upper/Lower, Full Body, Strength)
-- 🥗 7-Day Indian Diet Planner (AI-powered via Groq LLaMA 3.1)
+- 🥗 7-Day Indian Diet Planner (AI-powered via Groq LLaMA 3.3)
 - 🤖 AI Chat Trainer (multi-turn conversation)
 - 📊 Progress Tracker with charts
 - 🧮 BMI, BMR, TDEE, Protein calculations
@@ -45,7 +45,7 @@ Fitness_AI/
 ├── app.py          # Main Streamlit app & page routing
 ├── auth.py         # Login / Register logic
 ├── database.py     # SQL Server connection & schema setup
-├── ai_engine.py    # Groq LLaMA 3.1 AI calls
+├── ai_engine.py    # Groq LLaMA 3.3 AI calls
 ├── config.py       # Environment variable loader
 ├── diet.py         # Diet planner UI page
 ├── workout.py      # Workout generator UI page + calculations
@@ -59,7 +59,7 @@ Fitness_AI/
 | Layer | Technology |
 |-------|-----------|
 | Frontend | Streamlit |
-| AI/LLM | Groq API (LLaMA 3.1 70B) |
+| AI/LLM | Groq API (LLaMA 3.3 70B) |
 | Database | SQL Server Express (pyodbc) |
 | Auth | bcrypt password hashing |
 | Config | python-dotenv |
